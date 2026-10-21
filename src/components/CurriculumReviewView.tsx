@@ -1,7 +1,7 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { collection, onSnapshot, query, where } from 'firebase/firestore';
 import { getFunctions, httpsCallable } from 'firebase/functions';
-import { AlertCircle, CheckCircle2, RefreshCw, Send, XCircle } from 'lucide-react';
+import { AlertCircle, CheckCircle2, ExternalLink, Send, XCircle } from 'lucide-react';
 import { COURSES } from '../data/coursesCurriculum';
 import { db } from '../lib/firebase';
 import {
@@ -142,30 +142,6 @@ export const CurriculumReviewView: React.FC<CurriculumReviewViewProps> = ({ admi
     }));
   };
 
-  const refreshSources = async () => {
-    setError(null);
-    setNotice(null);
-    setBusy(true);
-    try {
-      const refresh = httpsCallable<Record<string, never>, {
-        checked: number;
-        proposalsCreated: number;
-        failures: string[];
-      }>(functions, 'requestCurriculumRefresh');
-      const response = await refresh({});
-      const { checked, proposalsCreated, failures } = response.data;
-      setNotice(
-        `Checked ${checked} trusted sources and found ${proposalsCreated} update proposal${proposalsCreated === 1 ? '' : 's'}.`
-        + (failures.length ? ` ${failures.length} source${failures.length === 1 ? '' : 's'} could not be checked; see the function logs.` : ''),
-      );
-    } catch (refreshError) {
-      console.error('Could not refresh curriculum sources:', refreshError);
-      setError(refreshError instanceof Error ? refreshError.message : 'Could not refresh trusted sources.');
-    } finally {
-      setBusy(false);
-    }
-  };
-
   const rejectProposal = async () => {
     if (!selectedProposal) return;
     setError(null);
@@ -268,16 +244,19 @@ export const CurriculumReviewView: React.FC<CurriculumReviewViewProps> = ({ admi
           </p>
           <p className="mt-2 text-xs text-slate-500">Signed in as administrator {adminId}</p>
         </div>
-        <button
-          className="inline-flex items-center justify-center gap-2 rounded-xl border border-amber-500/40 bg-amber-500/10 px-4 py-3 text-sm font-semibold text-amber-200 transition-colors hover:bg-amber-500/20 disabled:cursor-wait disabled:opacity-60"
-          disabled={busy}
-          onClick={refreshSources}
-          type="button"
+        <a
+          className="inline-flex items-center justify-center gap-2 rounded-xl border border-amber-500/40 bg-amber-500/10 px-4 py-3 text-sm font-semibold text-amber-200 transition-colors hover:bg-amber-500/20"
+          href="https://github.com/kieltech9-coder/kieltech-academy/actions/workflows/curriculum-refresh.yml"
+          rel="noreferrer"
+          target="_blank"
         >
-          <RefreshCw className={`h-4 w-4 ${busy ? 'animate-spin' : ''}`} />
-          Check trusted sources now
-        </button>
+          <ExternalLink className="h-4 w-4" />
+          Check sources in GitHub Actions
+        </a>
       </header>
+      <p className="text-sm leading-6 text-slate-400">
+        Start a manual source check from the GitHub Actions page. Detected changes appear here as review proposals; no lessons or exams are changed automatically.
+      </p>
 
       {error && (
         <div className="flex items-start gap-2 rounded-xl border border-rose-500/30 bg-rose-950/30 p-4 text-sm text-rose-200" role="alert">
