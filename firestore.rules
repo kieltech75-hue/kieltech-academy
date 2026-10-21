@@ -1,0 +1,117 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // Helper functions
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+
+    function isOwner(userId) {
+      return isAuthenticated() && request.auth.uid == userId;
+    }
+
+    function isAdmin() {
+      return isAuthenticated()
+        && exists(/databases/$(database)/documents/users/$(request.auth.uid))
+        && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin';
+    }
+
+    match /users/{userId} {
+      allow read: if isOwner(userId) || isAdmin();
+      allow create: if isOwner(userId)
+        && request.resource.data.id == userId
+        && request.resource.data.role == 'student';
+      allow update: if isOwner(userId)
+        && request.resource.data.id == resource.data.id
+        && request.resource.data.role == resource.data.role
+        && request.resource.data.diff(resource.data).affectedKeys()
+          .hasOnly(['displayName', 'photoURL', 'currentCourseId', 'updatedAt']);
+      allow delete: if isOwner(userId);
+
+      match /progress/{courseId} {
+        allow read: if isOwner(userId) || isAdmin();
+        allow create, update: if isOwner(userId)
+          && request.resource.data.userId == userId
+          && request.resource.data.courseId == courseId;
+        allow delete: if isOwner(userId);
+      }
+
+      match /bookmarks/{bookmarkId} {
+        allow read: if isOwner(userId);
+        allow create, update: if isOwner(userId) && request.resource.data.userId == userId;
+        allow delete: if isOwner(userId);
+      }
+
+      match /results/{resultId} {
+        allow read: if isOwner(userId) || isAdmin();
+        allow create, update: if isOwner(userId) && request.resource.data.userId == userId;
+        allow delete: if isOwner(userId);
+      }
+
+      match /curriculumNotices/{updateId} {
+        allow read: if isOwner(userId);
+        allow create, update: if isOwner(userId)
+          && request.resource.data.updateId == updateId
+          && request.resource.data.seenAt is string;
+        allow delete: if isOwner(userId);
+      }
+    }
+
+    match /curriculumProposals/{proposalId} {
+      allow read: if isAdmin();
+      allow write: if false;
+    }
+
+    match /publishedCurriculumUpdates/{updateId} {
+      allow read: if isAuthenticated();
+      allow write: if false;
+    }
+
+    match /curriculumSourceMonitors/{courseId} {
+      allow read, write: if false;
+    }
+
+    match /{path=**}/progress/{progressId} {
+      allow read: if isAdmin();
+    }
+
+    match /{path=**}/results/{resultId} {
+      allow read: if isAdmin();
+    }
+
+    match /academicActivity/{eventId} {
+      allow read: if isAdmin();
+      allow create: if isAuthenticated()
+        && request.resource.data.actorUid == request.auth.uid
+        && request.resource.data.type in [
+          'sign-in',
+          'account-created',
+          'sign-out',
+          'course-selected',
+          'stage-viewed',
+          'stage-test-started',
+          'degree-defense-started',
+          'assessment-submitted',
+          'lesson-bookmarked',
+          'lesson-unbookmarked'
+        ]
+        && request.resource.data.createdAt == request.time
+        && request.resource.data.keys().hasOnly([
+          'actorUid',
+          'type',
+          'createdAt',
+          'courseId',
+          'courseName',
+          'stageId',
+          'assessmentType',
+          'score',
+          'totalQuestions',
+          'percentage',
+          'passed',
+          'lessonTitle'
+        ]);
+      allow update, delete: if false;
+    }
+  }
+}

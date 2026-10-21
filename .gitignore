@@ -1,0 +1,14 @@
+node_modules/
+build/
+dist/
+dist-server/
+functions/lib/
+.firebase/
+coverage/
+.DS_Store
+*.log
+.env*
+!.env.example
+*service-account*.json
+*firebase-adminsdk*.json
+*.pem

@@ -1,0 +1,6 @@
+{
+  "name": "PythonPath: Complete Stages of Learning Python",
+  "description": "Comprehensive interactive roadmap and learning system spanning all stages of Python mastery from syntax fundamentals to advanced internals and specialization tracks.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
