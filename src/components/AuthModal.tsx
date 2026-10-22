@@ -39,6 +39,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [resetSent, setResetSent] = useState(false);
+  const [verificationSent, setVerificationSent] = useState(false);
 
   if (!isOpen) return null;
 
@@ -68,6 +69,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
     e.preventDefault();
     setError(null);
     setResetSent(false);
+    setVerificationSent(false);
 
     const emailTrimmed = email.trim();
 
@@ -83,9 +85,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
         setResetSent(true);
       } catch (err: any) {
         console.error('Password Reset Error:', err);
-        if (err.code === 'auth/user-not-found') {
-          setError('No student account found with this email address.');
-        } else if (err.code === 'auth/invalid-email') {
+        if (err.code === 'auth/invalid-email') {
           setError('Invalid email address format.');
         } else {
           setError(err.message || 'Failed to dispatch password reset email.');
@@ -115,13 +115,21 @@ export const AuthModal: React.FC<AuthModalProps> = ({
     try {
       if (mode === 'signin') {
         await signInWithEmail(emailTrimmed, password);
+        onClose();
       } else {
         await signUpWithEmail(emailTrimmed, password, name.trim());
+        setPassword('');
+        setMode('signin');
+        setVerificationSent(true);
       }
-      onClose();
     } catch (err: any) {
       console.error('Email Auth Error:', err);
-      if (err.code === 'auth/user-not-found' || err.code === 'auth/wrong-password' || err.code === 'auth/invalid-credential') {
+      if (err.code === 'auth/email-not-verified') {
+        setError(null);
+        setMode('signin');
+        setPassword('');
+        setVerificationSent(true);
+      } else if (err.code === 'auth/user-not-found' || err.code === 'auth/wrong-password' || err.code === 'auth/invalid-credential') {
         setError('Invalid academic email or password credentials.');
       } else if (err.code === 'auth/email-already-in-use') {
         setError('An account with this email is already matriculated. Please sign in instead.');
@@ -190,7 +198,14 @@ export const AuthModal: React.FC<AuthModalProps> = ({
           {resetSent && (
             <div className="flex items-start gap-2.5 p-3 rounded-xl bg-emerald-950/60 border border-emerald-500/30 text-emerald-200 text-xs animate-in slide-in-from-top-1 leading-relaxed">
               <CheckCircle2 className="h-4 w-4 text-emerald-400 shrink-0 mt-0.5" />
-              <span>A password reset link has been dispatched to your email address. Please check your inbox and spam folders.</span>
+              <span>If an account matches that address, a password reset link will be sent. Check your inbox and spam folders.</span>
+            </div>
+          )}
+
+          {verificationSent && (
+            <div className="flex items-start gap-2.5 p-3 rounded-xl bg-emerald-950/60 border border-emerald-500/30 text-emerald-200 text-xs animate-in slide-in-from-top-1 leading-relaxed">
+              <CheckCircle2 className="h-4 w-4 text-emerald-400 shrink-0 mt-0.5" />
+              <span>Check your inbox for a KielTech verification link. Verify your email before signing in; check your spam folder if needed.</span>
             </div>
           )}
 
@@ -241,7 +256,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
               <div className="grid grid-cols-2 p-1 rounded-xl bg-slate-950 border border-slate-800 text-xs font-semibold">
                 <button
                   type="button"
-                  onClick={() => { setMode('signin'); setError(null); setResetSent(false); }}
+                  onClick={() => { setMode('signin'); setError(null); setResetSent(false); setVerificationSent(false); }}
                   className={`py-1.5 rounded-lg transition-all cursor-pointer ${
                     mode === 'signin'
                       ? 'bg-slate-800 text-white shadow-xs'
@@ -252,7 +267,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
                 </button>
                 <button
                   type="button"
-                  onClick={() => { setMode('signup'); setError(null); setResetSent(false); }}
+                  onClick={() => { setMode('signup'); setError(null); setResetSent(false); setVerificationSent(false); }}
                   className={`py-1.5 rounded-lg transition-all cursor-pointer ${
                     mode === 'signup'
                       ? 'bg-slate-800 text-white shadow-xs'

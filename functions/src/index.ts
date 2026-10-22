@@ -9,6 +9,15 @@ initializeApp();
 const db = getFirestore();
 const REGION = 'us-central1';
 
+async function hasAdminAccess(uid: string): Promise<boolean> {
+  const roleSnapshot = await db.collection('user_roles').doc(uid).get();
+  if (roleSnapshot.exists) {
+    return roleSnapshot.data()?.role === 'admin' || roleSnapshot.data()?.role === 'CEO & Founder';
+  }
+  const legacyProfile = await db.collection('users').doc(uid).get();
+  return legacyProfile.data()?.role === 'admin';
+}
+
 export const scheduledCurriculumRefresh = onSchedule(
   {
     schedule: '0 9 1 */6 *',
@@ -28,8 +37,7 @@ export const requestCurriculumRefresh = onCall(
     if (!request.auth) {
       throw new HttpsError('unauthenticated', 'Sign in with an administrator account to refresh sources.');
     }
-    const adminSnapshot = await db.collection('users').doc(request.auth.uid).get();
-    if (adminSnapshot.data()?.role !== 'admin') {
+    if (!await hasAdminAccess(request.auth.uid)) {
       throw new HttpsError('permission-denied', 'Only curriculum administrators can refresh sources.');
     }
 
@@ -43,8 +51,7 @@ export const publishCurriculumProposal = onCall(
     if (!request.auth) {
       throw new HttpsError('unauthenticated', 'Sign in with an administrator account to publish curriculum updates.');
     }
-    const adminSnapshot = await db.collection('users').doc(request.auth.uid).get();
-    if (adminSnapshot.data()?.role !== 'admin') {
+    if (!await hasAdminAccess(request.auth.uid)) {
       throw new HttpsError('permission-denied', 'Only curriculum administrators can publish curriculum updates.');
     }
 
@@ -167,8 +174,7 @@ export const rejectCurriculumProposal = onCall(
     if (!request.auth) {
       throw new HttpsError('unauthenticated', 'Sign in with an administrator account to review proposals.');
     }
-    const adminSnapshot = await db.collection('users').doc(request.auth.uid).get();
-    if (adminSnapshot.data()?.role !== 'admin') {
+    if (!await hasAdminAccess(request.auth.uid)) {
       throw new HttpsError('permission-denied', 'Only curriculum administrators can review proposals.');
     }
     const proposalId = request.data?.proposalId;

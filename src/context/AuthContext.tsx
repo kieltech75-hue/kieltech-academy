@@ -9,7 +9,6 @@ import {
   onAuthStateChanged,
   setPersistence,
   updateProfile,
-  sendPasswordResetEmail
 } from 'firebase/auth';
 import { 
   collection,
@@ -44,7 +43,7 @@ export interface StudentProfile {
   email: string;
   displayName: string;
   photoURL?: string;
-  role: 'student' | 'faculty' | 'admin';
+  role: 'student' | 'faculty' | 'admin' | 'owner';
   studentId: string;
   currentCourseId?: string;
   matriculationDate: string;
@@ -93,6 +92,52 @@ interface AuthContextType {
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
+async function loadServerManagedRole(firebaseUser: User, legacyRole: StudentProfile['role']) {
+  const safeLegacyRole = legacyRole === 'owner' ? 'student' : legacyRole;
+  try {
+    const response = await fetch('/api/account/role', {
+      cache: 'no-store',
+      headers: { Authorization: `Bearer ${await firebaseUser.getIdToken()}` },
+    });
+    if (!response.headers.get('content-type')?.includes('application/json')) {
+      console.warn('The account-role API is unavailable. Deploy the authenticated Node backend to enable owner roles.');
+      return safeLegacyRole;
+    }
+    const result = await response.json() as { role?: unknown; error?: string };
+    if (!response.ok) {
+      throw new Error(result.error || 'The server could not load the account role.');
+    }
+    if (result.role === 'student' || result.role === 'faculty'
+      || result.role === 'admin' || result.role === 'owner') {
+      return result.role;
+    }
+    throw new Error('The server returned an invalid account role.');
+  } catch (error) {
+    console.error('Could not load the server-managed account role:', error);
+    return safeLegacyRole;
+  }
+}
+
+async function requestAuthEmail(
+  action: 'password-reset' | 'verify-email',
+  options: { email?: string; idToken?: string },
+): Promise<void> {
+  const response = await fetch('/api/auth/email-action', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      ...(options.idToken ? { Authorization: `Bearer ${options.idToken}` } : {}),
+    },
+    body: JSON.stringify({ action, ...(options.email ? { email: options.email } : {}) }),
+  });
+  const result = response.headers.get('content-type')?.includes('application/json')
+    ? await response.json() as { error?: string }
+    : { error: 'The email service is unavailable. Run the local Express server or configure the deployed backend.' };
+  if (!response.ok) {
+    throw new Error(result.error || 'The email could not be sent. Please try again later.');
+  }
+}
+
 // Generate deterministic-looking academic student ID
 function generateStudentId(uid: string): string {
   let hash = 0;
@@ -109,6 +154,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [loading, setLoading] = useState(true);
   const [authModalOpen, setAuthModalOpen] = useState(false);
   const sessionTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const allowUnverifiedAuthRef = useRef(false);
+  const authStateVersionRef = useRef(0);
 
   const recordAcademicActivity: AuthContextType['recordAcademicActivity'] = useCallback(async (event) => {
     if (!auth.currentUser) return;
@@ -133,7 +180,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       if (snap.exists()) {
         const data = snap.data() as StudentProfile;
         await updateDoc(userDocRef, { updatedAt: now });
-        return data;
+        return {
+          ...data,
+          role: await loadServerManagedRole(firebaseUser, data.role || 'student'),
+        };
       } else {
         const studentId = generateStudentId(firebaseUser.uid);
         const newProfile: StudentProfile = {
@@ -148,7 +198,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           updatedAt: now,
         };
         await setDoc(userDocRef, newProfile);
-        return newProfile;
+        return {
+          ...newProfile,
+          role: await loadServerManagedRole(firebaseUser, newProfile.role),
+        };
       }
     } catch (err) {
       console.error('Error syncing user profile in Firestore:', err);
@@ -158,13 +211,30 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (currentUser) => {
+      const eventVersion = ++authStateVersionRef.current;
+      if (auth.currentUser?.uid !== currentUser?.uid) return;
       if (sessionTimerRef.current) {
         clearTimeout(sessionTimerRef.current);
         sessionTimerRef.current = null;
       }
       if (currentUser) {
+        const requiresEmailVerification = currentUser.providerData.some(
+          (provider) => provider.providerId === 'password',
+        ) && !currentUser.emailVerified;
+        if (requiresEmailVerification) {
+          setUser(null);
+          setProfile(null);
+          setLoading(false);
+          if (!allowUnverifiedAuthRef.current) {
+            setAuthModalOpen(true);
+            await fbSignOut(auth);
+          }
+          return;
+        }
+
         try {
           const token = await currentUser.getIdTokenResult();
+          if (eventVersion !== authStateVersionRef.current) return;
           const authenticatedAt = Date.parse(token.authTime);
           if (!Number.isFinite(authenticatedAt)) {
             throw new Error('Firebase did not provide a valid authentication timestamp.');
@@ -186,6 +256,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
           if (authenticatedAt + SESSION_DURATION_MS <= Date.now()) {
             await fbSignOut(auth);
+            if (eventVersion !== authStateVersionRef.current) return;
             setUser(null);
             setProfile(null);
             setAuthModalOpen(true);
@@ -199,8 +270,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           );
           setUser(currentUser);
           const prof = await syncUserProfile(currentUser);
+          if (eventVersion !== authStateVersionRef.current) return;
           setProfile(prof);
         } catch (e) {
+          if (eventVersion !== authStateVersionRef.current) return;
           console.error('Failed to load profile on auth state change:', e);
           setUser(currentUser);
           setProfile(null);
@@ -209,7 +282,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         setUser(null);
         setProfile(null);
       }
-      setLoading(false);
+      if (eventVersion === authStateVersionRef.current) setLoading(false);
     });
 
     return () => {
@@ -235,10 +308,30 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   };
 
   const signInWithEmail = async (email: string, pass: string) => {
+    allowUnverifiedAuthRef.current = true;
     try {
       await setPersistence(auth, browserLocalPersistence);
       const res = await signInWithEmailAndPassword(auth, email.trim(), pass);
       if (res.user) {
+        if (!res.user.emailVerified) {
+          let verificationSent = false;
+          try {
+            await requestAuthEmail('verify-email', { idToken: await res.user.getIdToken() });
+            verificationSent = true;
+          } catch (error) {
+            console.error('Could not send a verification email for an unverified account:', error);
+          } finally {
+            await fbSignOut(auth);
+            setUser(null);
+            setProfile(null);
+          }
+          throw Object.assign(
+            new Error(verificationSent
+              ? 'Your account is not verified yet. A new verification email has been sent.'
+              : 'Your account is not verified, and a verification email could not be sent. Please try again later.'),
+            { code: verificationSent ? 'auth/email-not-verified' : 'auth/verification-email-failed' },
+          );
+        }
         const prof = await syncUserProfile(res.user);
         setProfile(prof);
         setAuthModalOpen(false);
@@ -247,31 +340,44 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     } catch (error: any) {
       console.error('Email Sign-In Error:', error);
       throw error;
+    } finally {
+      allowUnverifiedAuthRef.current = false;
     }
   };
 
   const signUpWithEmail = async (email: string, pass: string, name: string) => {
+    allowUnverifiedAuthRef.current = true;
+    let createdUid: string | undefined;
     try {
       await setPersistence(auth, browserLocalPersistence);
       const res = await createUserWithEmailAndPassword(auth, email.trim(), pass);
       if (res.user) {
+        createdUid = res.user.uid;
         if (name.trim()) {
           await updateProfile(res.user, { displayName: name.trim() });
         }
-        const prof = await syncUserProfile(res.user);
-        setProfile(prof);
-        setAuthModalOpen(false);
+        await requestAuthEmail('verify-email', { idToken: await res.user.getIdToken() });
         await recordAcademicActivity({ type: 'account-created' });
+        await fbSignOut(auth);
+        setUser(null);
+        setProfile(null);
       }
     } catch (error: any) {
       console.error('Email Sign-Up Error:', error);
+      if (createdUid && auth.currentUser?.uid === createdUid) {
+        await fbSignOut(auth);
+        setUser(null);
+        setProfile(null);
+      }
       throw error;
+    } finally {
+      allowUnverifiedAuthRef.current = false;
     }
   };
 
   const sendPasswordReset = async (email: string) => {
     try {
-      await sendPasswordResetEmail(auth, email.trim());
+      await requestAuthEmail('password-reset', { email: email.trim() });
     } catch (error: any) {
       console.error('Password Reset Error:', error);
       throw error;

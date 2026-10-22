@@ -12,7 +12,7 @@ import {
   ChevronDown, 
   FileText,
   Home,
-  ClipboardCheck
+  ClipboardCheck,
 } from 'lucide-react';
 import { KielTechLogo } from './KielTechLogo';
 import { useAuth } from '../context/AuthContext';
@@ -35,7 +35,7 @@ interface NavbarProps {
   onSwitchTrack?: () => void;
   onOpenDiploma?: () => void;
   onOpenResults?: () => void;
-  onOpenCurriculumReview?: () => void;
+  onToggleAdminPage?: () => void;
 }
 
 export const Navbar: React.FC<NavbarProps> = ({
@@ -56,10 +56,17 @@ export const Navbar: React.FC<NavbarProps> = ({
   onSwitchTrack,
   onOpenDiploma,
   onOpenResults,
-  onOpenCurriculumReview,
+  onToggleAdminPage,
 }) => {
   const handleToggle = onToggleSidebar || onOpenMobileSidebar;
   const { user, profile, signOut, setAuthModalOpen } = useAuth();
+  const roleLabel = profile?.role === 'owner'
+    ? 'CEO & Founder'
+    : profile?.role === 'admin'
+      ? 'Admin'
+      : profile?.role === 'faculty'
+        ? 'Faculty'
+        : 'Student';
   const [profileDropdownOpen, setProfileDropdownOpen] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
 
@@ -170,18 +177,23 @@ export const Navbar: React.FC<NavbarProps> = ({
             </button>
           )}
 
-          {profile?.role === 'admin' && onOpenCurriculumReview && (
+          {(profile?.role === 'admin' || profile?.role === 'owner') && onToggleAdminPage && (
             <button
-              aria-current={activeView === 'curriculum-review' || activeView === 'admin' ? 'page' : undefined}
-              aria-label="Open admin dashboard"
+              aria-current={activeView === 'curriculum-review' || activeView === 'admin' || activeView === 'owner-management' ? 'page' : undefined}
+              aria-label={activeView === 'curriculum-review' || activeView === 'admin' || activeView === 'owner-management'
+                ? 'Close admin page'
+                : 'Open admin dashboard'}
               className={`inline-flex shrink-0 items-center gap-1.5 rounded-xl border px-2.5 py-2 text-xs font-bold transition-colors sm:px-3 ${
                 activeView === 'curriculum-review'
                   || activeView === 'admin'
+                  || activeView === 'owner-management'
                   ? 'border-amber-400/60 bg-amber-500/20 text-amber-200'
                   : 'border-amber-500/40 bg-slate-900/90 text-amber-300 hover:border-amber-400/70 hover:bg-amber-500/10'
               }`}
-              onClick={onOpenCurriculumReview}
-              title="Open admin dashboard"
+              onClick={onToggleAdminPage}
+              title={activeView === 'curriculum-review' || activeView === 'admin' || activeView === 'owner-management'
+                ? 'Close admin page'
+                : 'Open admin dashboard'}
               type="button"
             >
               <ClipboardCheck aria-hidden="true" className="h-4 w-4" />
@@ -227,7 +239,7 @@ export const Navbar: React.FC<NavbarProps> = ({
                     {profile?.displayName || 'Student'}
                   </span>
                   <span className="text-[10px] font-mono text-amber-400 block leading-tight">
-                    {profile?.studentId || 'KT-Candidate'}
+                    {profile?.role === 'owner' ? 'CEO & Founder' : profile?.studentId || 'KT-Candidate'}
                   </span>
                 </div>
                 <ChevronDown className="h-3.5 w-3.5 text-slate-400 hidden sm:block" />
@@ -240,7 +252,7 @@ export const Navbar: React.FC<NavbarProps> = ({
                     <div className="flex items-center gap-2">
                       <span className="h-2 w-2 rounded-full bg-emerald-400" />
                       <span className="text-xs font-mono text-emerald-400 uppercase font-bold tracking-wider">
-                        Matriculated
+                            {roleLabel}
                       </span>
                     </div>
                     <p className="text-sm font-bold text-white mt-1 truncate">
@@ -248,6 +260,11 @@ export const Navbar: React.FC<NavbarProps> = ({
                     </p>
                     <p className="text-xs text-slate-400 truncate font-mono">
                       {profile?.email}
+                    </p>
+                    <p className={`mt-1 text-[11px] font-mono font-bold uppercase ${
+                      profile?.role === 'owner' ? 'text-amber-300' : 'text-slate-400'
+                    }`}>
+                      Account role: {roleLabel}
                     </p>
                     <div className="mt-2 pt-2 border-t border-slate-800/80 flex items-center justify-between text-[11px] font-mono">
                       <span className="text-slate-400">Student ID</span>

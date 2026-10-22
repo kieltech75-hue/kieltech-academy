@@ -14,6 +14,7 @@ import {
   BookOpen,
   ClipboardCheck,
   GraduationCap,
+  ShieldCheck,
   Users,
 } from 'lucide-react';
 import { db } from '../lib/firebase';
@@ -24,6 +25,8 @@ import type { StudentProfile } from '../context/AuthContext';
 interface AdminDashboardProps {
   adminId: string;
   onOpenCurriculumReview: () => void;
+  isOwner?: boolean;
+  onManageAdmins?: () => void;
 }
 
 interface AdminCourseProgress {
@@ -82,6 +85,8 @@ function eventDescription(event: AcademicActivityEvent): string {
 export const AdminDashboard: React.FC<AdminDashboardProps> = ({
   adminId,
   onOpenCurriculumReview,
+  isOwner = false,
+  onManageAdmins,
 }) => {
   const [activeTab, setActiveTab] = useState<DashboardTab>('overview');
   const [students, setStudents] = useState<StudentProfile[]>([]);
@@ -205,21 +210,35 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
       <header className="flex flex-col gap-4 border-b border-slate-800 pb-6 sm:flex-row sm:items-end sm:justify-between">
         <div>
           <p className="text-xs font-semibold uppercase tracking-wider text-amber-300">Academic operations</p>
-          <h1 className="mt-1 text-3xl font-bold text-white">Admin dashboard</h1>
+          <h1 className="mt-1 text-3xl font-bold text-white">
+            {isOwner ? 'CEO & Founder dashboard' : 'Admin dashboard'}
+          </h1>
           <p className="mt-2 max-w-3xl text-sm leading-6 text-slate-400">
             Review student enrollment, learning progress, assessment outcomes, and recent course activity.
             Student records are visible only to authorized administrators.
           </p>
           <p className="mt-2 text-xs text-slate-500">Administrator account: {adminId}</p>
         </div>
-        <button
-          className="inline-flex items-center justify-center gap-2 rounded-xl border border-amber-500/40 bg-amber-500/10 px-4 py-3 text-sm font-semibold text-amber-200 transition-colors hover:bg-amber-500/20"
-          onClick={onOpenCurriculumReview}
-          type="button"
-        >
-          <GraduationCap className="h-4 w-4" />
-          Curriculum review
-        </button>
+        <div className="flex flex-wrap gap-2">
+          {isOwner && onManageAdmins && (
+            <button
+              className="inline-flex items-center justify-center gap-2 rounded-xl border border-cyan-500/40 bg-cyan-500/10 px-4 py-3 text-sm font-semibold text-cyan-200 transition-colors hover:bg-cyan-500/20"
+              onClick={onManageAdmins}
+              type="button"
+            >
+              <ShieldCheck className="h-4 w-4" />
+              Manage admins
+            </button>
+          )}
+          <button
+            className="inline-flex items-center justify-center gap-2 rounded-xl border border-amber-500/40 bg-amber-500/10 px-4 py-3 text-sm font-semibold text-amber-200 transition-colors hover:bg-amber-500/20"
+            onClick={onOpenCurriculumReview}
+            type="button"
+          >
+            <GraduationCap className="h-4 w-4" />
+            Curriculum review
+          </button>
+        </div>
       </header>
 
       {failureMessages.length > 0 && (

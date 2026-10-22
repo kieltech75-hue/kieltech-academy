@@ -21,6 +21,11 @@ import { HomePage } from './components/HomePage';
 import { CookieConsentModal } from './components/CookieConsentModal';
 import { CurriculumReviewView } from './components/CurriculumReviewView';
 import { AdminDashboard } from './components/AdminDashboard';
+import { AboutView } from './components/AboutView';
+import { PrivacyPolicyView } from './components/PrivacyPolicyView';
+import { OwnerManagementView } from './components/OwnerManagementView';
+
+type AppView = 'home' | 'stage' | 'test' | 'results' | 'exam' | 'about' | 'privacy-policy' | 'admin' | 'curriculum-review' | 'owner-management';
 
 export default function App() {
   const { 
@@ -83,7 +88,8 @@ export default function App() {
   // 'test' = viewing locked stage test
   // 'results' = student Academic Transcript Portal
   // 'exam' = graduation examination defense
-  const [activeView, setActiveView] = useState<'home' | 'stage' | 'test' | 'results' | 'exam' | 'admin' | 'curriculum-review'>('home');
+  const [activeView, setActiveView] = useState<AppView>('home');
+  const previousAdminReturnView = useRef<AppView>('home');
   const lastViewedStageActivity = useRef<string | null>(null);
 
   // Mobile sidebar toggle state
@@ -668,9 +674,14 @@ export default function App() {
           setActiveView('results');
           window.scrollTo({ top: 0, behavior: 'smooth' });
         }}
-        onOpenCurriculumReview={() => {
-          if (profile?.role !== 'admin') return;
-          setActiveView('admin');
+        onToggleAdminPage={() => {
+          if (profile?.role !== 'admin' && profile?.role !== 'owner') return;
+          if (activeView === 'admin' || activeView === 'curriculum-review' || activeView === 'owner-management') {
+            setActiveView(previousAdminReturnView.current);
+          } else {
+            previousAdminReturnView.current = activeView;
+            setActiveView('admin');
+          }
           window.scrollTo({ top: 0, behavior: 'smooth' });
         }}
       />
@@ -690,8 +701,8 @@ export default function App() {
             currentCourse={selectedCourse}
           />
         </main>
-      ) : activeView === 'admin' || activeView === 'curriculum-review' ? (
-        profile?.role === 'admin' ? (
+      ) : activeView === 'admin' || activeView === 'curriculum-review' || activeView === 'owner-management' ? (
+        profile?.role === 'admin' || profile?.role === 'owner' ? (
           <div className="mx-auto flex w-full max-w-7xl flex-1 transition-all duration-300">
             <Sidebar
               course={selectedCourse}
@@ -707,6 +718,14 @@ export default function App() {
               onRemoveBookmark={handleRemoveBookmark}
               onOpenResults={() => {
                 setActiveView('results');
+                window.scrollTo({ top: 0, behavior: 'smooth' });
+              }}
+              onOpenAbout={() => {
+                setActiveView('about');
+                window.scrollTo({ top: 0, behavior: 'smooth' });
+              }}
+              onOpenPrivacyPolicy={() => {
+                setActiveView('privacy-policy');
                 window.scrollTo({ top: 0, behavior: 'smooth' });
               }}
               onOpenExam={() => {
@@ -729,14 +748,23 @@ export default function App() {
               onToggleDesktop={handleToggleSidebar}
             />
             <main className="min-w-0 flex-1 p-4 sm:p-6 lg:p-8">
-              {activeView === 'admin'
-                ? (
+              {activeView === 'admin' ? (
                   <AdminDashboard
                     adminId={user?.uid ?? profile.id}
                     onOpenCurriculumReview={() => setActiveView('curriculum-review')}
+                    isOwner={profile.role === 'owner'}
+                    onManageAdmins={() => setActiveView('owner-management')}
                   />
-                )
-                : <CurriculumReviewView adminId={user?.uid ?? profile.id} />}
+                ) : activeView === 'owner-management' ? (
+                  profile.role === 'owner'
+                    ? <OwnerManagementView />
+                    : <AdminDashboard
+                      adminId={user?.uid ?? profile.id}
+                      onOpenCurriculumReview={() => setActiveView('curriculum-review')}
+                    />
+                ) : (
+                  <CurriculumReviewView adminId={user?.uid ?? profile.id} />
+                )}
             </main>
           </div>
         ) : (
@@ -744,7 +772,7 @@ export default function App() {
             <section className="w-full rounded-2xl border border-rose-500/30 bg-rose-950/20 p-6 text-center">
               <h1 className="text-xl font-bold text-white">Admin access required</h1>
               <p className="mt-2 text-sm leading-6 text-slate-300">
-                This page is available only to accounts with the administrator role.
+                This page is available only to accounts with the administrator or owner role.
               </p>
               <button
                 className="mt-5 rounded-xl bg-amber-400 px-4 py-2.5 text-sm font-bold text-slate-950 hover:bg-amber-300"
@@ -774,6 +802,14 @@ export default function App() {
               setActiveView('results');
               window.scrollTo({ top: 0, behavior: 'smooth' });
             }}
+            onOpenAbout={() => {
+              setActiveView('about');
+              window.scrollTo({ top: 0, behavior: 'smooth' });
+            }}
+            onOpenPrivacyPolicy={() => {
+              setActiveView('privacy-policy');
+              window.scrollTo({ top: 0, behavior: 'smooth' });
+            }}
             onOpenExam={() => {
               recordAcademicActivity({
                 type: 'degree-defense-started',
@@ -795,6 +831,8 @@ export default function App() {
 
           {/* Content Pane */}
           <main className="flex-1 p-4 sm:p-6 lg:p-8 min-w-0">
+          {activeView === 'about' && <AboutView />}
+          {activeView === 'privacy-policy' && <PrivacyPolicyView />}
           {/* View 1: Normal Stage Teachings */}
           {activeView === 'stage' && (
             <StageTeachingView

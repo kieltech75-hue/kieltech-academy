@@ -26,6 +26,8 @@ import {
   ArrowRight,
   PanelLeftClose,
   HelpCircle,
+  Info,
+  ShieldCheck,
   Bookmark,
   BookmarkCheck,
   Trash2,
@@ -40,7 +42,7 @@ interface SidebarProps {
   currentStageId: number;
   completedStageIds: number[];
   unlockedStageIds: number[];
-  activeView: 'stage' | 'test' | 'results' | 'exam';
+  activeView: 'stage' | 'test' | 'results' | 'exam' | 'about' | 'privacy-policy';
   hasGraduated?: boolean;
   bookmarkedLessons?: BookmarkedLesson[];
   onSelectStage: (stageId: number) => void;
@@ -48,6 +50,8 @@ interface SidebarProps {
   onRemoveBookmark?: (lessonId: string) => void;
   onOpenResults: () => void;
   onOpenExam: () => void;
+  onOpenAbout: () => void;
+  onOpenPrivacyPolicy: () => void;
   onOpenDiploma?: () => void;
   onChangeCourse: () => void;
   onSelectCourse?: (newCourse: LanguageCourse) => void;
@@ -71,6 +75,8 @@ export const Sidebar: React.FC<SidebarProps> = ({
   onRemoveBookmark,
   onOpenResults,
   onOpenExam,
+  onOpenAbout,
+  onOpenPrivacyPolicy,
   onOpenDiploma,
   onChangeCourse,
   onSelectCourse,
@@ -491,6 +497,41 @@ export const Sidebar: React.FC<SidebarProps> = ({
                 </span>
               </button>
             )}
+          </div>
+
+          <div className="pt-4 border-t border-slate-800">
+            <button
+              type="button"
+              onClick={() => {
+                onOpenAbout();
+                onCloseMobile();
+              }}
+              aria-current={activeView === 'about' ? 'page' : undefined}
+              className={`w-full flex items-center gap-2.5 rounded-xl border p-3 text-left text-xs font-semibold transition-colors cursor-pointer ${
+                activeView === 'about'
+                  ? 'border-cyan-500/40 bg-cyan-500/15 text-cyan-200'
+                  : 'border-transparent text-slate-300 hover:border-slate-700 hover:bg-slate-800 hover:text-white'
+              }`}
+            >
+              <Info className="h-4 w-4 text-cyan-400" />
+              <span>About KielTech Academy</span>
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                onOpenPrivacyPolicy();
+                onCloseMobile();
+              }}
+              aria-current={activeView === 'privacy-policy' ? 'page' : undefined}
+              className={`mt-1 w-full flex items-center gap-2.5 rounded-xl border p-3 text-left text-xs font-semibold transition-colors cursor-pointer ${
+                activeView === 'privacy-policy'
+                  ? 'border-emerald-500/40 bg-emerald-500/15 text-emerald-200'
+                  : 'border-transparent text-slate-300 hover:border-slate-700 hover:bg-slate-800 hover:text-white'
+              }`}
+            >
+              <ShieldCheck className="h-4 w-4 text-emerald-400" />
+              <span>Privacy Policy</span>
+            </button>
           </div>
         </div>
 
