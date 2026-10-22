@@ -2,7 +2,8 @@ import React, { createContext, useContext, useEffect, useState, useMemo, useRef,
 import { 
   User, 
   browserLocalPersistence,
-  signInWithPopup, 
+  getRedirectResult,
+  signInWithRedirect,
   signInWithEmailAndPassword, 
   createUserWithEmailAndPassword, 
   signOut as fbSignOut, 
@@ -210,6 +211,17 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   };
 
   useEffect(() => {
+    void getRedirectResult(auth)
+      .then((result) => {
+        if (result?.user) {
+          setAuthModalOpen(false);
+          void recordAcademicActivity({ type: 'sign-in' });
+        }
+      })
+      .catch((error: unknown) => {
+        console.error('Google redirect sign-in failed:', error);
+      });
+
     const unsubscribe = onAuthStateChanged(auth, async (currentUser) => {
       const eventVersion = ++authStateVersionRef.current;
       if (auth.currentUser?.uid !== currentUser?.uid) return;
@@ -289,18 +301,12 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       unsubscribe();
       if (sessionTimerRef.current) clearTimeout(sessionTimerRef.current);
     };
-  }, []);
+  }, [recordAcademicActivity]);
 
   const signInWithGoogle = async () => {
     try {
       await setPersistence(auth, browserLocalPersistence);
-      const res = await signInWithPopup(auth, googleProvider);
-      if (res.user) {
-        const prof = await syncUserProfile(res.user);
-        setProfile(prof);
-        setAuthModalOpen(false);
-        await recordAcademicActivity({ type: 'sign-in' });
-      }
+      await signInWithRedirect(auth, googleProvider);
     } catch (error: any) {
       console.error('Google Sign-In Error:', error);
       throw error;
