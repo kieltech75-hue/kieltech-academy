@@ -22,6 +22,7 @@ import {
   serverTimestamp,
 } from 'firebase/firestore';
 import { auth, googleProvider, db } from '../lib/firebase';
+import { apiUrl } from '../lib/api';
 import { TestResultRecord } from '../types/curriculum';
 import { AcademicActivityType } from '../types/adminActivity';
 
@@ -96,7 +97,7 @@ const AuthContext = createContext<AuthContextType | undefined>(undefined);
 async function loadServerManagedRole(firebaseUser: User, legacyRole: StudentProfile['role']) {
   const safeLegacyRole = legacyRole === 'owner' ? 'student' : legacyRole;
   try {
-    const response = await fetch('/api/account/role', {
+    const response = await fetch(apiUrl('/api/account/role'), {
       cache: 'no-store',
       headers: { Authorization: `Bearer ${await firebaseUser.getIdToken()}` },
     });
@@ -123,7 +124,7 @@ async function requestAuthEmail(
   action: 'password-reset' | 'verify-email',
   options: { email?: string; idToken?: string },
 ): Promise<void> {
-  const response = await fetch('/api/auth/email-action', {
+  const response = await fetch(apiUrl('/api/auth/email-action'), {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',

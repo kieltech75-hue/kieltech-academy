@@ -1,6 +1,7 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import { AlertCircle, Loader2, RefreshCw, Shield, ShieldCheck, UserRoundX } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
+import { apiUrl } from '../lib/api';
 
 type ManagedRole = 'student' | 'faculty' | 'admin' | 'owner';
 
@@ -19,7 +20,7 @@ interface UsersResponse {
 }
 
 async function ownerRequest<T>(idToken: string, path: string, init?: RequestInit): Promise<T> {
-  const response = await fetch(path, {
+  const response = await fetch(apiUrl(path), {
     ...init,
     headers: {
       'Content-Type': 'application/json',

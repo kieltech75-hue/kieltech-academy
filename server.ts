@@ -14,6 +14,35 @@ dotenv.config();
 const app = express();
 const port = Number(process.env.PORT) || 3000;
 
+const allowedOrigins = new Set(
+  (process.env.ALLOWED_ORIGINS || '')
+    .split(',')
+    .map((origin) => origin.trim())
+    .filter(Boolean),
+);
+
+app.use((req, res, next) => {
+  const origin = req.get('origin');
+  if (!origin) {
+    next();
+    return;
+  }
+  if (!allowedOrigins.has(origin)) {
+    res.status(403).json({ error: 'This website origin is not allowed.' });
+    return;
+  }
+
+  res.set('Access-Control-Allow-Origin', origin);
+  res.set('Access-Control-Allow-Methods', 'GET, POST, PUT, OPTIONS');
+  res.set('Access-Control-Allow-Headers', 'Authorization, Content-Type');
+  res.set('Vary', 'Origin');
+  if (req.method === 'OPTIONS') {
+    res.status(204).end();
+    return;
+  }
+  next();
+});
+
 app.use(express.json({ limit: '16kb' }));
 
 const emailActionRateLimit = rateLimit({
@@ -47,6 +76,10 @@ function getFirebaseAdminFirestore() {
   getFirebaseAdminAuth();
   return getFirestore();
 }
+
+app.get('/api/health', (_req, res) => {
+  res.json({ status: 'ok' });
+});
 
 type AccountRole = 'student' | 'faculty' | 'admin' | 'owner';
 
