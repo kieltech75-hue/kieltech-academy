@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { 
   X, 
   Mail, 
@@ -31,7 +31,14 @@ export const AuthModal: React.FC<AuthModalProps> = ({
   title = 'Student Matriculation & SSO',
   subtitle = 'Sign in to persist your academic transcript, exam scores, and conferred university diploma.'
 }) => {
-  const { signInWithGoogle, signInWithEmail, signUpWithEmail, sendPasswordReset } = useAuth();
+  const {
+    signInWithGoogle,
+    signInWithEmail,
+    signUpWithEmail,
+    sendPasswordReset,
+    googleSignInError,
+    clearGoogleSignInError,
+  } = useAuth();
   const [mode, setMode] = useState<'signin' | 'signup' | 'forgot'>('signin');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -40,6 +47,12 @@ export const AuthModal: React.FC<AuthModalProps> = ({
   const [error, setError] = useState<string | null>(null);
   const [resetSent, setResetSent] = useState(false);
   const [verificationSent, setVerificationSent] = useState(false);
+
+  useEffect(() => {
+    if (!googleSignInError) return;
+    setError(googleSignInError);
+    clearGoogleSignInError();
+  }, [googleSignInError, clearGoogleSignInError]);
 
   if (!isOpen) return null;
 

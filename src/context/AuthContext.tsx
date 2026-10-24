@@ -59,6 +59,8 @@ interface AuthContextType {
   loading: boolean;
   authModalOpen: boolean;
   setAuthModalOpen: (open: boolean) => void;
+  googleSignInError: string | null;
+  clearGoogleSignInError: () => void;
   signInWithGoogle: () => Promise<void>;
   signInWithEmail: (email: string, pass: string) => Promise<void>;
   signUpWithEmail: (email: string, pass: string, name: string) => Promise<void>;
@@ -150,11 +152,29 @@ function generateStudentId(uid: string): string {
   return `KT-${num}`;
 }
 
+function getGoogleSignInErrorMessage(error: unknown): string {
+  const firebaseError = error as { code?: unknown; message?: unknown };
+  const code = typeof firebaseError.code === 'string' ? firebaseError.code : 'unknown';
+  const message = typeof firebaseError.message === 'string' ? firebaseError.message : 'Unknown error';
+
+  if (code === 'auth/unauthorized-domain') {
+    return `Google sign-in was blocked because this website domain is not authorized in Firebase Authentication. Add the website domain under Authentication > Settings > Authorized domains. (${code})`;
+  }
+  if (code === 'auth/operation-not-allowed') {
+    return `Google sign-in is not enabled for this Firebase project. Enable the Google provider under Authentication > Sign-in method. (${code})`;
+  }
+  if (code === 'auth/network-request-failed') {
+    return `Google sign-in could not reach Firebase. Check your internet connection and try again. (${code})`;
+  }
+  return `Google sign-in could not be completed. (${code}: ${message})`;
+}
+
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [user, setUser] = useState<User | null>(null);
   const [profile, setProfile] = useState<StudentProfile | null>(null);
   const [loading, setLoading] = useState(true);
   const [authModalOpen, setAuthModalOpen] = useState(false);
+  const [googleSignInError, setGoogleSignInError] = useState<string | null>(null);
   const sessionTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const allowUnverifiedAuthRef = useRef(false);
   const authStateVersionRef = useRef(0);
@@ -221,6 +241,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       })
       .catch((error: unknown) => {
         console.error('Google redirect sign-in failed:', error);
+        setGoogleSignInError(getGoogleSignInErrorMessage(error));
+        setAuthModalOpen(true);
       });
 
     const unsubscribe = onAuthStateChanged(auth, async (currentUser) => {
@@ -306,6 +328,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const signInWithGoogle = async () => {
     try {
+      setGoogleSignInError(null);
       await setPersistence(auth, browserLocalPersistence);
       await signInWithRedirect(auth, googleProvider);
     } catch (error: any) {
@@ -474,6 +497,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     loading,
     authModalOpen,
     setAuthModalOpen,
+    googleSignInError,
+    clearGoogleSignInError: () => setGoogleSignInError(null),
     signInWithGoogle,
     signInWithEmail,
     signUpWithEmail,
@@ -486,7 +511,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     syncTestResultToCloud,
     loadTestResultsFromCloud,
     recordAcademicActivity,
-  }), [user, profile, loading, authModalOpen, recordAcademicActivity]);
+  }), [user, profile, loading, authModalOpen, googleSignInError, recordAcademicActivity]);
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 };
