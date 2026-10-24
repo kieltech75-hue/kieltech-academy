@@ -17,6 +17,8 @@ KielTech Academy is a React/Vite learning portal served by an Express server. AI
 
 The app uses Firebase Authentication and Cloud Firestore. Firebase Hosting serves the static Vite build; it does not run the Express server.
 
+Google sign-in uses redirect mode. Because the site is hosted at `kieltech-academy.web.app`, the Firebase web config uses that same origin as `authDomain` to avoid cross-site storage restrictions during redirect sign-in. In Google Cloud Console, add `https://kieltech-academy.web.app/__/auth/handler` as an authorized redirect URI for the OAuth web client used by Firebase Authentication. Ensure `kieltech-academy.web.app` is also listed under Firebase Authentication's authorized domains. The Google account chooser's displayed product name is controlled by the OAuth consent-screen branding in Google Cloud Console; it is separate from the redirect-domain setting.
+
 1. Install dependencies: `npm install`
 2. Sign in to Firebase CLI: `npx firebase-tools login`
 3. Build the site: `npm run build`
